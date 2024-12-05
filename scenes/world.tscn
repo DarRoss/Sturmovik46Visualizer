@@ -1,11 +1,37 @@
-[gd_scene load_steps=4 format=3 uid="uid://dtoud565gpnk2"]
+[gd_scene load_steps=11 format=3 uid="uid://dtoud565gpnk2"]
 
 [ext_resource type="Script" path="res://logic/MapLoaderDialog.cs" id="1_50tah"]
 [ext_resource type="Script" path="res://logic/World.cs" id="1_pib77"]
-[ext_resource type="Script" path="res://logic/CamController.cs" id="3_b4ch2"]
+[ext_resource type="PackedScene" uid="uid://dk52bwipvk7kq" path="res://scenes/cam_controller.tscn" id="3_tbvhr"]
+[ext_resource type="Shader" uid="uid://d2clywjv2yw54" path="res://shaders/heightmap.tres" id="4_hg36k"]
+[ext_resource type="Script" path="res://logic/HeightmapMesh.cs" id="5_1ec0x"]
+
+[sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_g372g"]
+
+[sub_resource type="Sky" id="Sky_mcqwb"]
+sky_material = SubResource("ProceduralSkyMaterial_g372g")
+
+[sub_resource type="Environment" id="Environment_36lpc"]
+background_mode = 2
+sky = SubResource("Sky_mcqwb")
+ambient_light_source = 3
+reflected_light_source = 2
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_8fcv3"]
+render_priority = 0
+shader = ExtResource("4_hg36k")
+
+[sub_resource type="PlaneMesh" id="PlaneMesh_k08g6"]
+material = SubResource("ShaderMaterial_8fcv3")
 
 [node name="World" type="Node3D"]
 script = ExtResource("1_pib77")
+
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="."]
+transform = Transform3D(-4.37114e-08, 0.5, -0.866025, 0, 0.866025, 0.5, 1, 2.18557e-08, -3.78552e-08, 0, 10, 0)
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource("Environment_36lpc")
 
 [node name="MapLoaderDialog" type="FileDialog" parent="."]
 title = "Open a File"
@@ -15,5 +41,8 @@ file_mode = 0
 access = 2
 script = ExtResource("1_50tah")
 
-[node name="CamController" type="Camera3D" parent="."]
-script = ExtResource("3_b4ch2")
+[node name="CamController" parent="." instance=ExtResource("3_tbvhr")]
+
+[node name="HeightmapMesh" type="MeshInstance3D" parent="."]
+mesh = SubResource("PlaneMesh_k08g6")
+script = ExtResource("5_1ec0x")

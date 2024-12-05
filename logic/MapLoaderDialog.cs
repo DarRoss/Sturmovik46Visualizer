@@ -3,6 +3,9 @@ using Godot;
 
 public partial class MapLoaderDialog : FileDialog
 {
+	[Signal]
+	public delegate void MapLoadedEventHandler();
+
     public override void _Ready()
     {
 		FileMode = FileModeEnum.OpenFile;
@@ -30,81 +33,95 @@ public partial class MapLoaderDialog : FileDialog
 			if(found)
 			{
 				found = false;
-				// read each map type
+				// read each map variant
 	            while (!found && (line = reader.ReadLine()) != null)
 	            {
 					tokens = line.Split("=");
 					// proceed if there is exactly one "=" in the line
 					if(!(found = tokens.Length != 2))
 					{
-						AssignPossibleMap(tokens[0], tokens[1], dirName);
-						found = MapData.Instance.AllMapsFound();
+						AssignSubMap(tokens[0], tokens[1], dirName);
+						found = MapData.Instance.AllSubmapsFound();
 					}
 	            }
-				if(!MapData.Instance.AllMapsFound())
+				if(MapData.Instance.AllSubmapsFound())
 				{
-					GD.PrintErr("INI file did not contain all map types");
+					EmitSignal(SignalName.MapLoaded);
+				}
+				else
+				{
+					GD.PrintErr("Selected INI file did not contain all map types");
 				}
 			}
 			else
 			{
-				GD.PrintErr("Could not find [MAP] section in INI file");
+				GD.PrintErr("Could not find [MAP] section in selected INI file");
 			}
         }
 		else
 		{
-			GD.PrintErr("File does not exist");
+			GD.PrintErr("Selected file does not exist");
 		}
 	}
 
-	private static void AssignPossibleMap(string mapType, string mapFileName, string dirPath)
+	private static void AssignSubMap(string submapVariant, string submapFileName, string dirPath)
 	{
-		string trimmedName = mapFileName.Trim();
-		if(trimmedName.EndsWith(".tga"))
+		string trimmedSubmapVariant = submapVariant.Trim();
+		MapData.Submap variant = MapData.Submap.NumSubmaps;
+		switch(trimmedSubmapVariant.ToLower())
 		{
-			string trimmedType = mapType.Trim();
-			MapData.Variant variant = MapData.Variant.NumVariants;
-			switch(trimmedType.ToLower())
+			case "colormap":
+			case "colourmap":
+				variant = MapData.Submap.Color;
+				break;
+			case "heightmap":
+				variant = MapData.Submap.Height;
+				break;
+			case "typemap":
+				variant = MapData.Submap.Type;
+				break;
+			case "farmap":
+				variant = MapData.Submap.Far;
+				break;
+			case "smallmap":
+			case "reflmap":
+				// ignore these submaps
+				break;
+			default:
+				GD.Print("Unrecognized submap \"" + trimmedSubmapVariant + "\". Ignoring");
+				break;
+		}
+		if(variant < MapData.Submap.NumSubmaps)
+		{
+			string trimmedFileName = submapFileName.Trim();
+			if(trimmedFileName.EndsWith(".tga"))
 			{
-				case "colormap":
-				case "colourmap":
-					variant = MapData.Variant.Color;
-					break;
-				case "heightmap":
-					variant = MapData.Variant.Height;
-					break;
-				case "typemap":
-					variant = MapData.Variant.Type;
-					break;
-				case "farmap":
-					variant = MapData.Variant.Far;
-					break;
-				case "smallmap":
-				case "reflmap":
-					// ignore these map types
-					break;
-				default:
-					GD.Print("Unrecognized map type \"" + trimmedType + "\". Ignoring");
-					break;
-			}
-			if(variant < MapData.Variant.NumVariants)
-			{
-				string mapPath = Path.Combine(dirPath, trimmedName);
-				Image image = Image.LoadFromFile(mapPath);
-				if(image != null)
+				string mapPath = Path.Combine(dirPath, trimmedFileName);
+				Image img = new();
+				img.Load(mapPath);
+				if(img != null)
 				{
-					MapData.Instance.maps[(int)variant] = image;
-					GD.Print("Successfully assigned filepath \"" + mapPath + "\"");
+					PortableCompressedTexture2D pct = new();
+					pct.CreateFromImage(img, PortableCompressedTexture2D.CompressionMode.Lossless);
+					if(pct != null)
+					{
+						MapData.Instance.submaps[(int)variant] = pct;
+//						GD.Print("Successfully assigned filepath \"" + mapPath + "\"");
+					}
+					else
+					{
+						GD.Print("Could not compress image \"" + mapPath + "\". Ignoring");
+					}
 				}
 				else
 				{
 					GD.Print("Could not load image from path \"" + mapPath + "\". Ignoring");
 				}
 			}
-		}
-		else
-		{
-			GD.Print("File \"" + trimmedName + "\" is not a TGA file. Ignoring");
+			else
+			{
+				GD.Print("File \"" + trimmedFileName + "\" is not a TGA file. Ignoring");
+			}
 		}
 	}
 }

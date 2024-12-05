@@ -2,30 +2,31 @@ using Godot;
 
 public partial class MapData : Node
 {
-    public enum Variant
+    public enum Submap
     {
         Height = 0,
         Color,
         Type,
         Far,
-        NumVariants
+        NumSubmaps
     }
 
     public static MapData Instance{get; private set;} = null;
 
-    public readonly Image[] maps = new Image[(int)Variant.NumVariants];
+    public readonly PortableCompressedTexture2D[] submaps = 
+        new PortableCompressedTexture2D[(int)Submap.NumSubmaps];
 
     public override void _Ready()
     {
         Instance ??= this;
     }
 
-    public bool AllMapsFound()
+    public bool AllSubmapsFound()
     {
         bool output = true;
-        for(int i = 0; i < maps.Length && output; ++i)
+        for(int i = 0; i < submaps.Length && output; ++i)
         {
-            output &= maps[i] != null;
+            output &= submaps[i] != null;
         }
         return output;
     }

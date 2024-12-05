@@ -1,0 +1,13 @@
+[gd_scene load_steps=2 format=3 uid="uid://dk52bwipvk7kq"]
+
+[ext_resource type="Script" path="res://logic/CamController.cs" id="1_7vekv"]
+
+[node name="CamController" type="Node3D"]
+script = ExtResource("1_7vekv")
+
+[node name="CamYaw" type="Node3D" parent="."]
+
+[node name="CamPitch" type="Node3D" parent="CamYaw"]
+
+[node name="CamFp" type="Camera3D" parent="CamYaw/CamPitch"]
+fov = 90.0
