@@ -16,7 +16,7 @@ public partial class CamController : Node3D
 	// x-axis denotes pitch rads, y-axis denotes yaw rads
 	private Vector2 camAngleBuffer = Vector2.Zero;
 
-	private float currSpeed = (MAX_SPEED + MIN_SPEED) / 2;
+	private float moveSpeed = (MAX_SPEED + MIN_SPEED) / 2;
 
 	public override void _Ready()
 	{
@@ -46,13 +46,13 @@ public partial class CamController : Node3D
 		}
 		if(ie.IsActionReleased("IncreaseSpeed"))
 		{
-			currSpeed *= SPD_INC_MULT;
-			currSpeed = Mathf.Min(currSpeed, MAX_SPEED);
+			moveSpeed *= SPD_INC_MULT;
+			moveSpeed = Mathf.Min(moveSpeed, MAX_SPEED);
 		}
 		if(ie.IsActionReleased("DecreaseSpeed"))
 		{
-			currSpeed /= SPD_INC_MULT;
-			currSpeed = Mathf.Max(currSpeed, MIN_SPEED);
+			moveSpeed /= SPD_INC_MULT;
+			moveSpeed = Mathf.Max(moveSpeed, MIN_SPEED);
 		}
     }
 
@@ -74,7 +74,7 @@ public partial class CamController : Node3D
 		{
 			Vector3 rotatedMovement = movementDelta.Rotated(Vector3.Right, camPitch.Rotation.X)
 				.Rotated(Vector3.Up, camYaw.Rotation.Y);
-			GlobalPosition += rotatedMovement * currSpeed * (float)delta;
+			GlobalPosition += rotatedMovement * moveSpeed * (float)delta;
 		}
 	}
 }

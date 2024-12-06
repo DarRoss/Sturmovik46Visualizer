@@ -4,7 +4,7 @@
 source = 5
 
 [sub_resource type="VisualShaderNodeTexture2DParameter" id="VisualShaderNodeTexture2DParameter_j18yo"]
-parameter_name = "FragFarmap"
+parameter_name = "FragTexture"
 texture_type = 1
 color_default = 1
 texture_filter = 5
@@ -55,7 +55,7 @@ operator = 1
 parameter_name = "VertHeightmap"
 texture_type = 1
 color_default = 1
-texture_filter = 6
+texture_filter = 4
 texture_repeat = 2
 
 [sub_resource type="VisualShaderNodeVectorOp" id="VisualShaderNodeVectorOp_ym1ab"]
@@ -137,8 +137,8 @@ source = 5
 code = "shader_type spatial;
 render_mode blend_mix, depth_draw_opaque, cull_back, diffuse_lambert, specular_schlick_ggx;
 
-uniform sampler2D VertHeightmap : source_color, hint_default_black, filter_linear_mipmap_anisotropic, repeat_disable;
-uniform sampler2D FragFarmap : source_color, hint_default_black, filter_nearest_mipmap_anisotropic, repeat_disable;
+uniform sampler2D VertHeightmap : source_color, hint_default_black, filter_linear_mipmap, repeat_disable;
+uniform sampler2D FragTexture : source_color, hint_default_black, filter_nearest_mipmap_anisotropic, repeat_disable;
 
 
 
@@ -258,7 +258,7 @@ void fragment() {
 
 	vec4 n_out2p0;
 // Texture2D:2
-	n_out2p0 = texture(FragFarmap, n_out4p0);
+	n_out2p0 = texture(FragTexture, n_out4p0);
 
 
 // Output:0
@@ -267,7 +267,7 @@ void fragment() {
 
 }
 "
-graph_offset = Vector2(-621.736, 155.491)
+graph_offset = Vector2(-619.218, -94.3439)
 nodes/vertex/0/position = Vector2(400, 500)
 nodes/vertex/2/node = SubResource("VisualShaderNodeTexture2DParameter_moouh")
 nodes/vertex/2/position = Vector2(-1340, -80)
@@ -325,9 +325,9 @@ nodes/vertex/30/node = SubResource("VisualShaderNodeFrame_siig2")
 nodes/vertex/30/position = Vector2(-460, 120)
 nodes/vertex/connections = PackedInt32Array(3, 0, 4, 1, 4, 0, 0, 0, 5, 0, 4, 0, 6, 0, 7, 1, 7, 0, 5, 1, 2, 0, 9, 2, 9, 0, 5, 0, 11, 0, 9, 0, 13, 0, 0, 1, 14, 0, 13, 0, 15, 0, 16, 1, 12, 1, 16, 0, 16, 0, 14, 1, 11, 0, 18, 0, 12, 0, 18, 1, 18, 0, 17, 0, 2, 0, 17, 2, 19, 0, 14, 0, 20, 0, 14, 2, 2, 0, 21, 2, 2, 0, 23, 2, 2, 0, 22, 2, 22, 0, 20, 1, 23, 0, 20, 0, 21, 0, 19, 1, 17, 0, 19, 0, 12, 0, 24, 1, 11, 0, 24, 0, 24, 0, 21, 0, 25, 0, 23, 0, 26, 0, 22, 0, 11, 0, 25, 0, 11, 0, 26, 0, 12, 1, 27, 1, 12, 2, 27, 0, 27, 0, 25, 1, 27, 0, 26, 1)
 nodes/fragment/2/node = SubResource("VisualShaderNodeTexture_hkptu")
-nodes/fragment/2/position = Vector2(200, 120)
+nodes/fragment/2/position = Vector2(200, 360)
 nodes/fragment/3/node = SubResource("VisualShaderNodeTexture2DParameter_j18yo")
-nodes/fragment/3/position = Vector2(-100, -80)
+nodes/fragment/3/position = Vector2(-100, 160)
 nodes/fragment/4/node = SubResource("VisualShaderNodeInput_j3b1s")
-nodes/fragment/4/position = Vector2(-100, 220)
+nodes/fragment/4/position = Vector2(-100, 460)
 nodes/fragment/connections = PackedInt32Array(2, 0, 0, 0, 3, 0, 2, 2, 4, 0, 2, 0)
