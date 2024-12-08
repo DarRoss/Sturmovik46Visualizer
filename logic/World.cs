@@ -9,7 +9,7 @@ public partial class World : Node3D
 	{
 		mld = GetNode<MapLoaderDialog>("MapLoaderDialog");
 		hmm = GetNode<HeightmapMesh>("HeightmapMesh");
-		Input.MouseMode = Input.MouseModeEnum.Captured;
+		Input.MouseMode = Input.MouseModeEnum.Visible;
 		mld.MapLoaded += hmm.UpdateHeightMap;
 	}
 

@@ -3,9 +3,9 @@ using Godot;
 public partial class CamController : Node3D
 {
 	private const float MOUSE_SENSE = 0.05f;
-	private const float MAX_CAM_PITCH = 89;
-	private const float MAX_SPEED = 200;
-	private const float MIN_SPEED = 10;
+	private const int MAX_CAM_PITCH = 89;
+	private const int MAX_SPEED = 5000;
+	private const int MIN_SPEED = 1;
 	private const float SPD_INC_MULT = 1.2f;
 
 	private Node3D camYaw;

@@ -20,6 +20,7 @@ reflected_light_source = 2
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_8fcv3"]
 render_priority = 0
 shader = ExtResource("4_hg36k")
+shader_parameter/MetersPerPixel = null
 
 [sub_resource type="PlaneMesh" id="PlaneMesh_k08g6"]
 material = SubResource("ShaderMaterial_8fcv3")

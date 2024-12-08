@@ -24,15 +24,15 @@ public partial class MapLoaderDialog : FileDialog
             string line;
 			bool submapSuccess = false;
 			bool map2dSuccess = false;
-            while ((!submapSuccess || !map2dSuccess) && (line = reader.ReadLine()) != null)
+            while ((!submapSuccess || !map2dSuccess) && (line = reader.ReadLine().Trim()) != null)
             {
-				switch(line.Trim().ToLower())
+				switch(line.ToLower())
 				{
 					case "[map]":
-						submapSuccess = ReadSubmaps(reader, iniPath);
+						submapSuccess = ReadSection(reader, iniPath, MapData.Section.Map);
 						break;
 					case "[map2d]":
-						map2dSuccess = ReadMap2d(reader, iniPath);
+						map2dSuccess = ReadSection(reader, iniPath, MapData.Section.Map2d);
 						break;
 				}
 
@@ -48,7 +48,7 @@ public partial class MapLoaderDialog : FileDialog
 		}
 	}
 
-	private static bool ReadSubmaps(StreamReader reader, string iniPath)
+	private static bool ReadSection(StreamReader reader, string iniPath, MapData.Section section)
 	{
 		string dirPath = Path.GetDirectoryName(iniPath);
 		string[] tokens;
@@ -56,141 +56,120 @@ public partial class MapLoaderDialog : FileDialog
 		bool breakWhile = false;
 		bool success = false;
 
-		// clear any previously loaded submap data
-		MapData.Instance.ClearSubmaps();
-		// read each submap variant
-        while (!success && !breakWhile && (line = reader.ReadLine()) != null)
+		// clear any previously loaded section data
+		MapData.Instance.ClearSection(section);
+		// read lines in this section
+        while (!success && !breakWhile && (line = reader.ReadLine().Trim()) != null)
         {
 			// ignore commented lines
-			if(line.Length > 0 && line[0] != ';')
+			if(line.Length > 0 && line[0] != ';' && line[0] != '/')
 			{
 				tokens = line.Split("=");
-				// only proceed if there is exactly one '='. otherwise break
-				if(!(breakWhile = tokens.Length != 2))
-				{
-					if(AssignSubMap(tokens[0].Trim(), tokens[1].Trim(), dirPath))
-					{
-						success = MapData.Instance.AllSubmapsFound();
-					}
-					// do not read the next line if it is the start of another section
-					breakWhile = reader.Peek() == '[';
-				}
+				AssignSectionEntry(section, dirPath, tokens);
+				success = MapData.Instance.IsSectionFulfilled(section);
 			}
+			// do not read the next line if it is the start of another section
+			breakWhile = reader.Peek() == '[';
         }
 		return success;
 	}
 
-	private static bool ReadMap2d(StreamReader reader, string iniPath)
+	private static void AssignSectionEntry(MapData.Section section, string dirPath, string[] tokens)
 	{
-		string dirPath = Path.GetDirectoryName(iniPath);
-		string line;
-		bool breakWhile = false;
-		bool success = false;
+		MapData.Submap submapVariant = MapData.Submap.NumSubmaps;
+		MapData.Fieldmap fieldVariant = MapData.Fieldmap.NumFields;
+		bool sectionIsValid = false;
+		string sectionStr = "[UNKNOWN SECTION]";
+		string fileName = "";
+		string variantStr;
 
-		// clear any previously loaded map2D data
-		MapData.Instance.Map2d = null;
-		// read each submap variant
-        while (!success && !breakWhile && (line = reader.ReadLine()) != null)
-        {
-			// ignore commented lines
-			if(line.Length > 0 && line[0] != ';')
-			{
-				success = AssignMap2d(line, dirPath);
-				// do not read the next line if it is the start of another section
-				breakWhile = reader.Peek() == '[';
-			}
-        }
-		return success;
-	}
-
-	private static bool AssignSubMap(string trimmedVariant, string trimmedFileName, string dirPath)
-	{
-		bool success = false;
-		MapData.Submap variant = MapData.Submap.NumSubmaps;
-		switch(trimmedVariant.ToLower())
+		switch(section)
 		{
-			case "heightmap":
-				variant = MapData.Submap.Height;
+			case MapData.Section.Map:
+				sectionStr = "MAP";
+				if(tokens.Length == 2)
+				{
+					variantStr = tokens[0].Trim();
+					fileName = tokens[1].Trim();
+					switch(variantStr.ToLower())
+					{
+						case "heightmap":
+							submapVariant = MapData.Submap.Height;
+							break;
+						case "typemap":
+							submapVariant = MapData.Submap.Type;
+							break;
+						case "farmap":
+						case "colormap":
+						case "colourmap":
+						case "smallmap":
+						case "reflmap":
+							// ignore these submaps
+							break;
+						default:
+							GD.Print("[MAP]: Unrecognized submap variant \"" + variantStr + "\". Ignoring");
+							break;
+					}
+					sectionIsValid = submapVariant < MapData.Submap.NumSubmaps;
+				}
 				break;
-			case "typemap":
-				variant = MapData.Submap.Type;
+			case MapData.Section.Map2d:
+				sectionStr = "MAP2D";
+				if(sectionIsValid = tokens.Length == 1)
+				{
+					fileName = tokens[0].Trim();
+				}
 				break;
-			case "farmap":
-			case "colormap":
-			case "colourmap":
-			case "smallmap":
-			case "reflmap":
-				// ignore these submaps
-				break;
-			default:
-				GD.Print("Unrecognized submap \"" + trimmedVariant + "\". Ignoring");
+			case MapData.Section.Fields:
+				sectionStr = "FIELDS";
+				if(tokens.Length == 2)
+				{
+					// TODO
+				}
 				break;
 		}
-		if(variant < MapData.Submap.NumSubmaps)
+
+		if(sectionIsValid)
 		{
-			if(trimmedFileName.EndsWith(".tga"))
+			if(fileName.EndsWith(".tga"))
 			{
-				string mapPath = Path.Combine(dirPath, trimmedFileName);
+				string tgaPath = Path.Combine(dirPath, fileName);
 				Image img = new();
-				img.Load(mapPath);
+				img.Load(tgaPath);
 				if(img != null)
 				{
 					PortableCompressedTexture2D pct = new();
 					pct.CreateFromImage(img, PortableCompressedTexture2D.CompressionMode.Lossless);
-					if(success = pct != null)
+					if(pct != null)
 					{
-						MapData.Instance.submaps[(int)variant] = pct;
-						GD.Print("Successfully assigned submap filepath \"" + mapPath + "\"");
+						switch(section)
+						{
+							case MapData.Section.Map2d:
+								MapData.Instance.Map2d = pct;
+								break;
+							case MapData.Section.Map:
+								MapData.Instance.submaps[(int)submapVariant] = pct;
+								break;
+							case MapData.Section.Fields:
+								// TODO
+								break;
+						}
+						GD.Print("[" + sectionStr + "]: successfully assigned image \"" + tgaPath + "\"");
 					}
 					else
 					{
-						GD.Print("Could not compress image \"" + mapPath + "\". Ignoring");
+						GD.Print("[" + sectionStr + "]: could not compress image \"" + tgaPath + "\". Ignoring");
 					}
 				}
 				else
 				{
-					GD.Print("Could not load image from path \"" + mapPath + "\". Ignoring");
+					GD.Print("[" + sectionStr + "]: could not load image from path \"" + tgaPath + "\". Ignoring");
 				}
 			}
 			else
 			{
-				GD.Print("Submap file \"" + trimmedFileName + "\" is not a TGA file. Ignoring");
+				GD.Print("[" + sectionStr + "]: file \"" + fileName + "\" is not a TGA file. Ignoring");
 			}
 		}
-		return success;
-	}
-
-	private static bool AssignMap2d(string trimmedFileName, string dirPath)
-	{
-		bool success = false;
-		if(trimmedFileName.EndsWith(".tga"))
-		{
-			string map2dPath = Path.Combine(dirPath, trimmedFileName);
-			Image img = new();
-			img.Load(map2dPath);
-			if(img != null)
-			{
-				PortableCompressedTexture2D pct = new();
-				pct.CreateFromImage(img, PortableCompressedTexture2D.CompressionMode.Lossless);
-				if(success = pct != null)
-				{
-					MapData.Instance.Map2d = pct;
-					GD.Print("Successfully assigned map2D filepath \"" + map2dPath + "\"");
-				}
-				else
-				{
-					GD.Print("Could not compress image \"" + map2dPath + "\". Ignoring");
-				}
-			}
-			else
-			{
-				GD.Print("Could not load image from path \"" + map2dPath + "\". Ignoring");
-			}
-		}
-		else
-		{
-			GD.Print("Map2D file \"" + trimmedFileName + "\" is not a TGA file. Ignoring");
-		}
-		return success;
 	}
 }

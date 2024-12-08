@@ -8,6 +8,7 @@ public partial class HeightmapMesh : MeshInstance3D
 	public override void _Ready()
 	{
 		heightMapPlane = (PlaneMesh)Mesh;
+		(heightMapPlane.Material as ShaderMaterial).SetShaderParameter("MetersPerPixel", MapData.METERS_PER_PIXEL);
 	}
 
 	public void UpdateHeightMap()
@@ -15,7 +16,7 @@ public partial class HeightmapMesh : MeshInstance3D
 		PortableCompressedTexture2D heightPct = MapData.Instance.submaps[(int)MapData.Submap.Height];
 		PortableCompressedTexture2D typePct = MapData.Instance.Map2d;
 		Vector2I textureSize = (Vector2I)heightPct.GetSize();
-		heightMapPlane.Size = textureSize;
+		heightMapPlane.Size = textureSize * MapData.METERS_PER_PIXEL;
 		heightMapPlane.SubdivideWidth = textureSize.X / DIVISION_MODIFIER;
 		heightMapPlane.SubdivideDepth = textureSize.Y / DIVISION_MODIFIER;
 		(heightMapPlane.Material as ShaderMaterial).SetShaderParameter("VertHeightmap", heightPct);

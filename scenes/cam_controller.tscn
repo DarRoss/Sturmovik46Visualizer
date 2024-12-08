@@ -11,3 +11,4 @@ script = ExtResource("1_7vekv")
 
 [node name="CamFp" type="Camera3D" parent="CamYaw/CamPitch"]
 fov = 90.0
+far = 50000.0
