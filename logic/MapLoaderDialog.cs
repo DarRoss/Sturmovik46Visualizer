@@ -12,32 +12,27 @@ public partial class MapLoaderDialog : FileDialog
 		Access = AccessEnum.Filesystem;
 		AddFilter("*.ini", "INI Files");
 		Title = "Open an INI File";
-		FileSelected += OpenLoadIni;
+		FileSelected += ReadIniSections;
 		UseNativeDialog = true;
     }
 
-	private void OpenLoadIni(string iniPath)
+	private void ReadIniSections(string iniPath)
 	{
 		if(File.Exists(iniPath))
 		{
             using StreamReader reader = new(iniPath);
             string line;
-			bool submapSuccess = false;
-			bool map2dSuccess = false;
-            while ((!submapSuccess || !map2dSuccess) && (line = reader.ReadLine().Trim()) != null)
+			MapData.Section section;
+            while ((line = reader.ReadLine()) != null)
             {
-				switch(line.ToLower())
+				line = line.Trim();
+				section = MapData.GetSectionFromStr(line);
+				if(section != MapData.Section.Unknown)
 				{
-					case "[map]":
-						submapSuccess = ReadSection(reader, iniPath, MapData.Section.Map);
-						break;
-					case "[map2d]":
-						map2dSuccess = ReadSection(reader, iniPath, MapData.Section.Map2d);
-						break;
+					ReadSectionLines(reader, iniPath, section);
 				}
-
             }
-			if(submapSuccess && map2dSuccess)
+			if(MapData.Instance.AllSectionsFulfilled())
 			{
 				EmitSignal(SignalName.MapLoaded);
 			}
@@ -48,7 +43,7 @@ public partial class MapLoaderDialog : FileDialog
 		}
 	}
 
-	private static bool ReadSection(StreamReader reader, string iniPath, MapData.Section section)
+	private static bool ReadSectionLines(StreamReader reader, string iniPath, MapData.Section section)
 	{
 		string dirPath = Path.GetDirectoryName(iniPath);
 		string[] tokens;
@@ -59,8 +54,9 @@ public partial class MapLoaderDialog : FileDialog
 		// clear any previously loaded section data
 		MapData.Instance.ClearSection(section);
 		// read lines in this section
-        while (!success && !breakWhile && (line = reader.ReadLine().Trim()) != null)
+        while (!success && !breakWhile && (line = reader.ReadLine()) != null)
         {
+			line = line.Trim();
 			// ignore commented lines
 			if(line.Length > 0 && line[0] != ';' && line[0] != '/')
 			{
@@ -76,67 +72,72 @@ public partial class MapLoaderDialog : FileDialog
 
 	private static void AssignSectionEntry(MapData.Section section, string dirPath, string[] tokens)
 	{
-		MapData.Submap submapVariant = MapData.Submap.NumSubmaps;
-		MapData.Fieldmap fieldVariant = MapData.Fieldmap.NumFields;
-		bool sectionIsValid = false;
-		string sectionStr = "[UNKNOWN SECTION]";
+		MapData.Submap submapVariant = MapData.Submap.Unknown;
+		MapData.Fieldmap fieldVariant = MapData.Fieldmap.Unknown;
+		int fieldIndex = -1;
+		bool variantIsValid = false;
 		string fileName = "";
-		string variantStr;
+		string variantStr = "UNKNOWN";
 
 		switch(section)
 		{
 			case MapData.Section.Map:
-				sectionStr = "MAP";
 				if(tokens.Length == 2)
 				{
 					variantStr = tokens[0].Trim();
 					fileName = tokens[1].Trim();
-					switch(variantStr.ToLower())
+					submapVariant = MapData.GetSubmapFromStr(variantStr);
+					if(submapVariant == MapData.Submap.Unknown)
 					{
-						case "heightmap":
-							submapVariant = MapData.Submap.Height;
-							break;
-						case "typemap":
-							submapVariant = MapData.Submap.Type;
-							break;
-						case "farmap":
-						case "colormap":
-						case "colourmap":
-						case "smallmap":
-						case "reflmap":
-							// ignore these submaps
-							break;
-						default:
-							GD.Print("[MAP]: Unrecognized submap variant \"" + variantStr + "\". Ignoring");
-							break;
+						GD.Print("[MAP]: Unrecognized submap variant \"" + variantStr + "\". Ignoring");
 					}
-					sectionIsValid = submapVariant < MapData.Submap.NumSubmaps;
+					variantIsValid = submapVariant < MapData.Submap.NumSubmaps;
 				}
 				break;
 			case MapData.Section.Map2d:
-				sectionStr = "MAP2D";
-				if(sectionIsValid = tokens.Length == 1)
+				if(variantIsValid = tokens.Length == 1)
 				{
 					fileName = tokens[0].Trim();
 				}
 				break;
 			case MapData.Section.Fields:
-				sectionStr = "FIELDS";
 				if(tokens.Length == 2)
 				{
-					// TODO
+					variantStr = tokens[0].Trim();
+					fileName = tokens[1].Trim();
+					fieldVariant = MapData.GetFieldmapFromStr(variantStr);
+					if(fieldVariant == MapData.Fieldmap.Unknown)
+					{
+						GD.Print("[FIELDS]: Unknown field variant \"" + variantStr + "\". Ignoring");
+					}
+					if(fieldVariant < MapData.Fieldmap.NumFields)
+					{
+						// convert last char to index number
+						fieldIndex = variantStr[^1] - '0';
+						// field index must be within field variant array index bounds
+						variantIsValid = fieldIndex < MapData.ENTRIES_PER_FIELD && fieldIndex >= 0;
+					}
 				}
 				break;
 		}
-
-		if(sectionIsValid)
+		if(variantIsValid)
 		{
+			string sectionStr = MapData.SectionToStr(section);
 			if(fileName.EndsWith(".tga"))
 			{
-				string tgaPath = Path.Combine(dirPath, fileName);
+				string imgPath;
+				if(section == MapData.Section.Fields)
+				{
+					// image is found in "_Tex" dir
+					imgPath = Path.Combine(Path.GetDirectoryName(dirPath), "_Tex", fileName);
+				}
+				else
+				{
+					// image is found in same dir as load.ini
+					imgPath = Path.Combine(dirPath, fileName);
+				}
 				Image img = new();
-				img.Load(tgaPath);
-				if(img != null)
+				if(img.Load(imgPath) == Error.Ok)
 				{
 					PortableCompressedTexture2D pct = new();
 					pct.CreateFromImage(img, PortableCompressedTexture2D.CompressionMode.Lossless);
@@ -151,24 +152,28 @@ public partial class MapLoaderDialog : FileDialog
 								MapData.Instance.submaps[(int)submapVariant] = pct;
 								break;
 							case MapData.Section.Fields:
-								// TODO
+								MapData.Instance.fieldmaps[(int)fieldVariant, fieldIndex] = pct;
 								break;
 						}
-						GD.Print("[" + sectionStr + "]: successfully assigned image \"" + tgaPath + "\"");
+						GD.Print(sectionStr + ": successfully assigned image \"" + imgPath + "\"");
 					}
 					else
 					{
-						GD.Print("[" + sectionStr + "]: could not compress image \"" + tgaPath + "\". Ignoring");
+						GD.Print(sectionStr + ": failed to compress image \"" + imgPath + "\". Ignoring");
 					}
 				}
 				else
 				{
-					GD.Print("[" + sectionStr + "]: could not load image from path \"" + tgaPath + "\". Ignoring");
+					GD.Print(sectionStr + ": failed to load image \"" + imgPath + "\". Ignoring");
+					if(section != MapData.Section.Map2d)
+					{
+						GD.Print("\tVariant name: " + variantStr);
+					}
 				}
 			}
 			else
 			{
-				GD.Print("[" + sectionStr + "]: file \"" + fileName + "\" is not a TGA file. Ignoring");
+				GD.Print(sectionStr + ": file \"" + fileName + "\" is not a TGA file. Ignoring");
 			}
 		}
 	}

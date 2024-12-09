@@ -11,13 +11,17 @@ public partial class MapData : Node
         Map = 0,
         Map2d,
         Fields,
-        NumSections
+        NumSections,
+        Unknown
     }
     public enum Submap
     {
         Height = 0,
         Type,
-        NumSubmaps
+        NumSubmaps,
+        // submaps we do not care about
+        Irrelevant,
+        Unknown
     }
     public enum Fieldmap
     {
@@ -29,7 +33,8 @@ public partial class MapData : Node
         AirField,
         Wood,
         Water,
-        NumFields
+        NumFields,
+        Unknown
     }
 
     public readonly PortableCompressedTexture2D[] submaps = 
@@ -41,6 +46,98 @@ public partial class MapData : Node
     public override void _Ready()
     {
         Instance ??= this;
+    }
+
+    public static string SectionToStr(Section section)
+    {
+        string output = "[UNKNOWN]";
+        switch(section)
+        {
+            case Section.Map:
+                output = "[MAP]";
+                break;
+            case Section.Map2d:
+                output = "[MAP2D]";
+                break;
+            case Section.Fields:
+                output = "[FIELDS]";
+                break;
+        }
+        return output;
+    }
+
+    public static Section GetSectionFromStr(string sectionStr)
+    {
+        Section output = Section.Unknown;
+        switch(sectionStr.Trim().ToLower())
+        {
+    		case "[map]":
+                output = Section.Map;
+    			break;
+    		case "[map2d]":
+                output = Section.Map2d;
+    			break;
+            case "[fields]":
+                output = Section.Fields;
+                break;
+        }
+        return output;
+    }
+
+    public static Submap GetSubmapFromStr(string variantStr)
+    {
+        Submap output = Submap.Unknown;
+        switch(variantStr.Trim().ToLower())
+        {
+			case "heightmap":
+                output = Submap.Height;
+				break;
+			case "typemap":
+                output = Submap.Type;    
+				break;
+			case "farmap":
+			case "colormap":
+			case "colourmap":
+			case "smallmap":
+			case "reflmap":
+                output = Submap.Irrelevant;
+				break;
+        }
+        return output;
+    }
+
+    public static Fieldmap GetFieldmapFromStr(string variantStr)
+    {
+        Fieldmap output = Fieldmap.Unknown;
+        // remove the last character from the fieldmap variant
+		switch(variantStr.Trim().ToLower().Remove(variantStr.Length - 1))
+        {
+			case "lowland":
+                output = Fieldmap.LowLand;
+				break;
+			case "midland":
+                output = Fieldmap.MidLand;
+				break;
+			case "mount":
+                output = Fieldmap.Mount;
+				break;
+			case "country":
+                output = Fieldmap.Country;
+				break;
+			case "city":
+                output = Fieldmap.City;
+				break;
+			case "airfield":
+                output = Fieldmap.AirField;
+				break;
+			case "wood":
+                output = Fieldmap.Wood;
+				break;
+			case "water":
+                output = Fieldmap.Water;
+				break;
+        }
+        return output;
     }
 
     public bool IsSectionFulfilled(Section section)
@@ -58,11 +155,31 @@ public partial class MapData : Node
                 output = Map2d != null;
                 break;
             case Section.Fields:
-                // TODO
-                output = false;
+                int j;
+                bool isFieldFulfilled;
+                for(int i = 0; output && i < fieldmaps.GetLength(0); ++i)
+                {
+                    isFieldFulfilled = false;
+                    // at least one texture must exist per field
+                    for(j = 0; !isFieldFulfilled && j < fieldmaps.GetLength(1); ++j)
+                    {
+                        isFieldFulfilled |= fieldmaps[i,j] != null;
+                    }
+                    output &= isFieldFulfilled;
+                }
                 break;
         }
         return output;
+    }
+
+    public bool AllSectionsFulfilled()
+    {
+        bool isFulfilled = true;
+        for(int i = 0; isFulfilled && i < (int)Section.NumSections; ++i)
+        {
+            isFulfilled &= IsSectionFulfilled((Section)i);
+        }
+        return isFulfilled;
     }
 
     public void ClearSection(Section section)
