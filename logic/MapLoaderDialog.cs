@@ -60,7 +60,8 @@ public partial class MapLoaderDialog : FileDialog
 			// ignore commented lines
 			if(line.Length > 0 && line[0] != ';' && line[0] != '/')
 			{
-				tokens = line.Split("=");
+				tokens = line.Split("=", System.StringSplitOptions.TrimEntries 
+					| System.StringSplitOptions.RemoveEmptyEntries);
 				AssignSectionEntry(section, dirPath, tokens);
 				success = MapData.Instance.IsSectionFulfilled(section);
 			}
@@ -84,8 +85,8 @@ public partial class MapLoaderDialog : FileDialog
 			case MapData.Section.Map:
 				if(tokens.Length == 2)
 				{
-					variantStr = tokens[0].Trim();
-					fileName = tokens[1].Trim();
+					variantStr = tokens[0];
+					fileName = tokens[1];
 					submapVariant = MapData.GetSubmapFromStr(variantStr);
 					if(submapVariant == MapData.Submap.Unknown)
 					{
@@ -97,14 +98,34 @@ public partial class MapLoaderDialog : FileDialog
 			case MapData.Section.Map2d:
 				if(variantIsValid = tokens.Length == 1)
 				{
-					fileName = tokens[0].Trim();
+					fileName = tokens[0];
 				}
 				break;
 			case MapData.Section.Fields:
 				if(tokens.Length == 2)
 				{
-					variantStr = tokens[0].Trim();
-					fileName = tokens[1].Trim();
+					// look for commas in filename
+					int commaIndex = tokens[1].IndexOf(',');
+					if(commaIndex != -1)
+					{
+						// take substring prior to comma
+						fileName = tokens[1][..commaIndex].Trim();
+					}
+					else
+					{
+						// look for comments in filename
+						int commentIndex = tokens[1].IndexOf("//");
+						if(commentIndex != -1)
+						{
+							// take substring prior to comment
+							fileName = tokens[1][..commentIndex].Trim();
+						}
+						else
+						{
+							fileName = tokens[1];
+						}
+					}
+					variantStr = tokens[0];
 					fieldVariant = MapData.GetFieldmapFromStr(variantStr);
 					if(fieldVariant == MapData.Fieldmap.Unknown)
 					{
