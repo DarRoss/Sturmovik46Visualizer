@@ -35,11 +35,16 @@ public partial class MapLoaderDialog : FileDialog
 			if(MapData.Instance.AllSectionsFulfilled())
 			{
 				EmitSignal(SignalName.MapLoaded);
+				GD.Print("MAPLOADER:\tMap successfully loaded.");
+			}
+			else
+			{
+				GD.Print("MAPLOADER:\tMap failed to load due to unfulfilled sections.");
 			}
         }
 		else
 		{
-			GD.PrintErr("Selected file does not exist");
+			GD.PrintErr("FILEDIALOG:\tSelected file does not exist");
 		}
 	}
 
@@ -75,6 +80,7 @@ public partial class MapLoaderDialog : FileDialog
 	{
 		MapData.Submap submapVariant = MapData.Submap.Unknown;
 		MapData.Fieldmap fieldVariant = MapData.Fieldmap.Unknown;
+		MapData.Roadmap roadVariant = MapData.Roadmap.Unknown;
 		int fieldIndex = -1;
 		bool variantIsValid = false;
 		string fileName = "";
@@ -86,11 +92,11 @@ public partial class MapLoaderDialog : FileDialog
 				if(tokens.Length == 2)
 				{
 					variantStr = tokens[0];
-					fileName = tokens[1];
+					fileName = TrimDelimitersFromFileName(tokens[1]);
 					submapVariant = MapData.GetSubmapFromStr(variantStr);
 					if(submapVariant == MapData.Submap.Unknown)
 					{
-						GD.Print("[MAP]: Unrecognized submap variant \"" + variantStr + "\". Ignoring");
+						GD.Print("[MAP]:\tUnrecognized submap variant \"" + variantStr + "\". Ignoring");
 					}
 					variantIsValid = submapVariant < MapData.Submap.NumSubmaps;
 				}
@@ -98,38 +104,18 @@ public partial class MapLoaderDialog : FileDialog
 			case MapData.Section.Map2d:
 				if(variantIsValid = tokens.Length == 1)
 				{
-					fileName = tokens[0];
+					fileName = TrimDelimitersFromFileName(tokens[0]);
 				}
 				break;
 			case MapData.Section.Fields:
 				if(tokens.Length == 2)
 				{
-					// look for commas in filename
-					int commaIndex = tokens[1].IndexOf(',');
-					if(commaIndex != -1)
-					{
-						// take substring prior to comma
-						fileName = tokens[1][..commaIndex].Trim();
-					}
-					else
-					{
-						// look for comments in filename
-						int commentIndex = tokens[1].IndexOf("//");
-						if(commentIndex != -1)
-						{
-							// take substring prior to comment
-							fileName = tokens[1][..commentIndex].Trim();
-						}
-						else
-						{
-							fileName = tokens[1];
-						}
-					}
+					fileName = TrimDelimitersFromFileName(tokens[1]);
 					variantStr = tokens[0];
 					fieldVariant = MapData.GetFieldmapFromStr(variantStr);
 					if(fieldVariant == MapData.Fieldmap.Unknown)
 					{
-						GD.Print("[FIELDS]: Unknown field variant \"" + variantStr + "\". Ignoring");
+						GD.Print("[FIELDS]:\tUnknown field variant \"" + variantStr + "\". Ignoring");
 					}
 					if(fieldVariant < MapData.Fieldmap.NumFields)
 					{
@@ -138,6 +124,20 @@ public partial class MapLoaderDialog : FileDialog
 						// field index must be within field variant array index bounds
 						variantIsValid = fieldIndex < MapData.ENTRIES_PER_FIELD && fieldIndex >= 0;
 					}
+				}
+				break;
+			case MapData.Section.Roads:
+				if(tokens.Length == 2)
+				{
+					variantStr = tokens[0];
+					// files listed in [ROADS] omit file extension. Re-add it
+					fileName = TrimDelimitersFromFileName(tokens[1]) + ".tga";
+					roadVariant = MapData.GetRoadmapFromStr(variantStr);
+					if(roadVariant == MapData.Roadmap.Unknown)
+					{
+						GD.Print("[ROADS]:\tUnrecognized road variant \"" + variantStr + "\". Ignoring");
+					}
+					variantIsValid = roadVariant < MapData.Roadmap.NumRoads;
 				}
 				break;
 		}
@@ -175,17 +175,20 @@ public partial class MapLoaderDialog : FileDialog
 							case MapData.Section.Fields:
 								MapData.Instance.fieldmaps[(int)fieldVariant, fieldIndex] = pct;
 								break;
+							case MapData.Section.Roads:
+								MapData.Instance.roadmaps[(int)roadVariant] = pct;
+								break;
 						}
-						GD.Print(sectionStr + ": successfully assigned image \"" + imgPath + "\"");
+						GD.Print(sectionStr + ":\tsuccessfully assigned image \"" + imgPath + "\"");
 					}
 					else
 					{
-						GD.Print(sectionStr + ": failed to compress image \"" + imgPath + "\". Ignoring");
+						GD.Print(sectionStr + ":\tfailed to compress image \"" + imgPath + "\". Ignoring");
 					}
 				}
 				else
 				{
-					GD.Print(sectionStr + ": failed to load image \"" + imgPath + "\". Ignoring");
+					GD.Print(sectionStr + ":\tfailed to load image \"" + imgPath + "\". Ignoring");
 					if(section != MapData.Section.Map2d)
 					{
 						GD.Print("\tVariant name: " + variantStr);
@@ -194,8 +197,35 @@ public partial class MapLoaderDialog : FileDialog
 			}
 			else
 			{
-				GD.Print(sectionStr + ": file \"" + fileName + "\" is not a TGA file. Ignoring");
+				GD.Print(sectionStr + ":\tfile \"" + fileName + "\" is not a TGA file. Ignoring");
 			}
 		}
+	}
+
+	private static string TrimDelimitersFromFileName(string fileName)
+	{
+		string output;
+		// look for commas in filename
+		int commaIndex = fileName.IndexOf(',');
+		if(commaIndex > -1)
+		{
+			// take substring prior to comma
+			output = fileName[..commaIndex].Trim();
+		}
+		else
+		{
+			// look for comments in filename
+			int commentIndex = fileName.IndexOf("//");
+			if(commentIndex > -1)
+			{
+				// take substring prior to comment
+				output = fileName[..commentIndex].Trim();
+			}
+			else
+			{
+				output = fileName;
+			}
+		}
+		return output;
 	}
 }
