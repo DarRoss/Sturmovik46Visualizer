@@ -151,10 +151,12 @@ public partial class MapData : Node
                 }
                 break;
             case Section.Roads:
+                /*
                 for(i = 0; output && i < roadmaps.Length; ++i)
                 {
                     output &= roadmaps[i] != null;
                 }
+                */
                 break;
         }
         return output;
