@@ -3,6 +3,14 @@ using Godot;
 
 public partial class MapLoaderDialog : FileDialog
 {
+	private struct EntryData
+	{
+		public string FileName{get; set;}
+		public string VariantStr{get; set;}
+		public int VariantIndex{get; set;}
+		public int FieldIndex{get; set;}
+    }
+
 	[Signal]
 	public delegate void MapLoadedEventHandler();
 
@@ -55,7 +63,7 @@ public partial class MapLoaderDialog : FileDialog
 		string line;
 		bool breakWhile = false;
 		bool success = false;
-
+		EntryData data = new();
 		// clear any previously loaded section data
 		MapData.Instance.ClearSection(section);
 		// read lines in this section
@@ -67,7 +75,10 @@ public partial class MapLoaderDialog : FileDialog
 			{
 				tokens = line.Split("=", System.StringSplitOptions.TrimEntries 
 					| System.StringSplitOptions.RemoveEmptyEntries);
-				AssignSectionEntry(section, dirPath, tokens);
+				if(IsSectionEntryValid(section, tokens, ref data))
+				{
+					AssignSectionEntry(section, dirPath, ref data);
+				}
 				success = MapData.Instance.IsSectionFulfilled(section);
 			}
 			// do not read the next line if it is the start of another section
@@ -76,128 +87,116 @@ public partial class MapLoaderDialog : FileDialog
 		return success;
 	}
 
-	private static void AssignSectionEntry(MapData.Section section, string dirPath, string[] tokens)
+	private static bool IsSectionEntryValid(MapData.Section section, string[] tokens, ref EntryData data)
 	{
-		MapData.Submap submapVariant = MapData.Submap.Unknown;
-		MapData.Fieldmap fieldVariant = MapData.Fieldmap.Unknown;
-		MapData.Roadmap roadVariant = MapData.Roadmap.Unknown;
-		int fieldIndex = -1;
-		bool variantIsValid = false;
-		string fileName = "";
-		string variantStr = "UNKNOWN";
-
+		bool output = false;
 		switch(section)
 		{
 			case MapData.Section.Map:
 				if(tokens.Length == 2)
 				{
-					variantStr = tokens[0];
-					fileName = TrimDelimitersFromFileName(tokens[1]);
-					submapVariant = MapData.GetSubmapFromStr(variantStr);
-					if(submapVariant == MapData.Submap.Unknown)
+					data.VariantStr = tokens[0];
+					data.FileName = TrimDelimitersFromFileName(tokens[1]);
+					data.VariantIndex = (int)MapData.GetSubmapFromStr(data.VariantStr);
+					if(data.VariantIndex == (int)MapData.Submap.Unknown)
 					{
-						GD.Print("[MAP]:\tUnrecognized submap variant \"" + variantStr + "\". Ignoring");
+						GD.Print("[MAP]:\tUnrecognized submap variant \"" + data.VariantStr + "\". Ignoring");
 					}
-					variantIsValid = submapVariant < MapData.Submap.NumSubmaps;
+					output = data.VariantIndex < (int)MapData.Submap.NumSubmaps;
 				}
 				break;
 			case MapData.Section.Map2d:
-				if(variantIsValid = tokens.Length == 1)
+				if(output = tokens.Length == 1)
 				{
-					fileName = TrimDelimitersFromFileName(tokens[0]);
+					data.FileName = TrimDelimitersFromFileName(tokens[0]);
 				}
 				break;
 			case MapData.Section.Fields:
 				if(tokens.Length == 2)
 				{
-					fileName = TrimDelimitersFromFileName(tokens[1]);
-					variantStr = tokens[0];
-					fieldVariant = MapData.GetFieldmapFromStr(variantStr);
-					if(fieldVariant == MapData.Fieldmap.Unknown)
+					data.FileName = TrimDelimitersFromFileName(tokens[1]);
+					data.VariantStr = tokens[0];
+					data.VariantIndex = (int)MapData.GetFieldmapFromStr(data.VariantStr);
+					if(data.VariantIndex == (int)MapData.Fieldmap.Unknown)
 					{
-						GD.Print("[FIELDS]:\tUnknown field variant \"" + variantStr + "\". Ignoring");
+						GD.Print("[FIELDS]:\tUnknown field variant \"" + data.VariantStr + "\". Ignoring");
 					}
-					if(fieldVariant < MapData.Fieldmap.NumFields)
+					if(data.VariantIndex < (int)MapData.Fieldmap.NumFields)
 					{
 						// convert last char to index number
-						fieldIndex = variantStr[^1] - '0';
+						data.FieldIndex = data.VariantStr[^1] - '0';
 						// field index must be within field variant array index bounds
-						variantIsValid = fieldIndex < MapData.ENTRIES_PER_FIELD && fieldIndex >= 0;
+						output = data.FieldIndex < MapData.ENTRIES_PER_FIELD && data.FieldIndex >= 0;
 					}
 				}
 				break;
 			case MapData.Section.Roads:
 				if(tokens.Length == 2)
 				{
-					variantStr = tokens[0];
+					data.VariantStr = tokens[0];
 					// files listed in [ROADS] omit file extension. Re-add it
-					fileName = TrimDelimitersFromFileName(tokens[1]) + ".tga";
-					roadVariant = MapData.GetRoadmapFromStr(variantStr);
-					if(roadVariant == MapData.Roadmap.Unknown)
+					data.FileName = TrimDelimitersFromFileName(tokens[1]) + ".tga";
+					data.VariantIndex = (int)MapData.GetRoadmapFromStr(data.VariantStr);
+					if(data.VariantIndex == (int)MapData.Roadmap.Unknown)
 					{
-						GD.Print("[ROADS]:\tUnrecognized road variant \"" + variantStr + "\". Ignoring");
+						GD.Print("[ROADS]:\tUnrecognized road variant \"" + data.VariantStr + "\". Ignoring");
 					}
-					variantIsValid = roadVariant < MapData.Roadmap.NumRoads;
+					output = data.VariantIndex < (int)MapData.Roadmap.NumRoads;
 				}
 				break;
 		}
-		if(variantIsValid)
+		return output;
+	}
+
+	private static void AssignSectionEntry(MapData.Section section, string dirPath, ref EntryData data)
+	{
+		string sectionStr = MapData.SectionToStr(section);
+		Image img = new();
+		string imgPath;
+		if(section == MapData.Section.Map || section == MapData.Section.Map2d)
 		{
-			string sectionStr = MapData.SectionToStr(section);
-			if(fileName.EndsWith(".tga"))
+			// image is found in same directory as load.ini
+			imgPath = Path.Combine(dirPath, data.FileName);
+		}
+		else
+		{
+			// image is found in "_Tex" directory
+			imgPath = Path.Combine(Path.GetDirectoryName(dirPath), "_Tex", data.FileName);
+		}
+		if(img.Load(imgPath) == Error.Ok)
+		{
+			PortableCompressedTexture2D pct = new();
+			pct.CreateFromImage(img, PortableCompressedTexture2D.CompressionMode.Lossless);
+			if(pct != null)
 			{
-				string imgPath;
-				if(section == MapData.Section.Fields)
+				switch(section)
 				{
-					// image is found in "_Tex" dir
-					imgPath = Path.Combine(Path.GetDirectoryName(dirPath), "_Tex", fileName);
+					case MapData.Section.Map2d:
+						MapData.Instance.Map2d = pct;
+						break;
+					case MapData.Section.Map:
+						MapData.Instance.submaps[data.VariantIndex] = pct;
+						break;
+					case MapData.Section.Fields:
+						MapData.Instance.fieldmaps[data.VariantIndex, data.FieldIndex] = pct;
+						break;
+					case MapData.Section.Roads:
+						MapData.Instance.roadmaps[data.VariantIndex] = pct;
+						break;
 				}
-				else
-				{
-					// image is found in same dir as load.ini
-					imgPath = Path.Combine(dirPath, fileName);
-				}
-				Image img = new();
-				if(img.Load(imgPath) == Error.Ok)
-				{
-					PortableCompressedTexture2D pct = new();
-					pct.CreateFromImage(img, PortableCompressedTexture2D.CompressionMode.Lossless);
-					if(pct != null)
-					{
-						switch(section)
-						{
-							case MapData.Section.Map2d:
-								MapData.Instance.Map2d = pct;
-								break;
-							case MapData.Section.Map:
-								MapData.Instance.submaps[(int)submapVariant] = pct;
-								break;
-							case MapData.Section.Fields:
-								MapData.Instance.fieldmaps[(int)fieldVariant, fieldIndex] = pct;
-								break;
-							case MapData.Section.Roads:
-								MapData.Instance.roadmaps[(int)roadVariant] = pct;
-								break;
-						}
-						GD.Print(sectionStr + ":\tsuccessfully assigned image \"" + imgPath + "\"");
-					}
-					else
-					{
-						GD.Print(sectionStr + ":\tfailed to compress image \"" + imgPath + "\". Ignoring");
-					}
-				}
-				else
-				{
-					GD.Print(sectionStr + ":\tfailed to load image \"" + imgPath + "\". Ignoring");
-					if(section != MapData.Section.Map2d)
-					{
-						GD.Print("\tVariant name: " + variantStr);
-					}
-				}
+				GD.Print(sectionStr + ":\tsuccessfully assigned image \"" + imgPath + "\"");
 			}
 			else
 			{
-				GD.Print(sectionStr + ":\tfile \"" + fileName + "\" is not a TGA file. Ignoring");
+				GD.Print(sectionStr + ":\tfailed to compress image \"" + imgPath + "\". Ignoring");
+			}
+		}
+		else
+		{
+			GD.Print(sectionStr + ":\tfailed to load image \"" + imgPath + "\". Ignoring");
+			if(section != MapData.Section.Map2d)
+			{
+				GD.Print("\tVariant name: " + data.VariantStr);
 			}
 		}
 	}

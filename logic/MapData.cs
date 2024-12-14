@@ -119,7 +119,7 @@ public partial class MapData : Node
             Fieldmap.Mount => "Mount",
             Fieldmap.Country => "Country",
             Fieldmap.City => "City",
-            Fieldmap.AirField => "Airfield",
+            Fieldmap.AirField => "AirField",
             Fieldmap.Wood => "Wood",
             Fieldmap.Water => "Water",
             _ => "Unknown",
@@ -140,39 +140,37 @@ public partial class MapData : Node
     public bool IsSectionFulfilled(Section section)
     {
         bool output = true;
-        int i;
+        int variant;
         switch(section)
         {
             case Section.Map:
-                for(i = 0; output && i < submaps.Length; ++i)
+                for(variant = 0; output && variant < submaps.Length; ++variant)
                 {
-                    output &= submaps[i] != null;
+                    output &= submaps[variant] != null;
                 }
                 break;
             case Section.Map2d:
                 output = Map2d != null;
                 break;
             case Section.Fields:
-                int j;
-                bool isFieldFulfilled;
-                for(i = 0; output && i < fieldmaps.GetLength(0); ++i)
+                int index;
+                for(variant = 0; output && variant < fieldmaps.GetLength(0); ++variant)
                 {
-                    isFieldFulfilled = false;
-                    // at least one texture must exist per field
-                    for(j = 0; !isFieldFulfilled && j < fieldmaps.GetLength(1); ++j)
+                    for(index = 0; output && index < fieldmaps.GetLength(1); ++index)
                     {
-                        isFieldFulfilled |= fieldmaps[i,j] != null;
+                        // ignore Wood1 and Wood3
+                        if((Fieldmap)variant != Fieldmap.Wood || index == 0 || index == 2)
+                        {
+                            output &= fieldmaps[variant,index] != null;
+                        }
                     }
-                    output &= isFieldFulfilled;
                 }
                 break;
             case Section.Roads:
-                /*
-                for(i = 0; output && i < roadmaps.Length; ++i)
+                for(variant = 0; output && variant < roadmaps.Length; ++variant)
                 {
-                    output &= roadmaps[i] != null;
+                    output &= roadmaps[variant] != null;
                 }
-                */
                 break;
         }
         return output;
@@ -180,42 +178,42 @@ public partial class MapData : Node
 
     public bool AllSectionsFulfilled()
     {
-        bool isFulfilled = true;
-        for(int i = 0; isFulfilled && i < (int)Section.NumSections; ++i)
+        bool output = true;
+        for(int section = 0; output && section < (int)Section.NumSections; ++section)
         {
-            isFulfilled &= IsSectionFulfilled((Section)i);
+            output &= IsSectionFulfilled((Section)section);
         }
-        return isFulfilled;
+        return output;
     }
 
     public void ClearSection(Section section)
     {
-        int i;
+        int variant;
         switch(section)
         {
             case Section.Map:
-                for(i = 0; i < submaps.Length; ++i)
+                for(variant = 0; variant < submaps.Length; ++variant)
                 {
-                    submaps[i] = null;
+                    submaps[variant] = null;
                 }
                 break;
             case Section.Map2d:
                 Map2d = null;
                 break;
             case Section.Fields:
-                int j;
-                for(i = 0; i < fieldmaps.GetLength(0); ++i)
+                int index;
+                for(variant = 0; variant < fieldmaps.GetLength(0); ++variant)
                 {
-                    for(j = 0; j < fieldmaps.GetLength(1); ++j)
+                    for(index = 0; index < fieldmaps.GetLength(1); ++index)
                     {
-                        fieldmaps[i,j] = null;
+                        fieldmaps[variant,index] = null;
                     }
                 }
                 break;
             case Section.Roads:
-                for(i = 0; i < submaps.Length; ++i)
+                for(variant = 0; variant < submaps.Length; ++variant)
                 {
-                    roadmaps[i] = null;
+                    roadmaps[variant] = null;
                 }
                 break;
         }
