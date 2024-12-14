@@ -21,9 +21,14 @@ reflected_light_source = 2
 render_priority = 0
 shader = ExtResource("4_hg36k")
 shader_parameter/MetersPerPixel = null
-shader_parameter/triplanar_scale = Vector3(1, 1, 1)
-shader_parameter/triplanar_offset = null
-shader_parameter/triplanar_sharpness = 0.5
+shader_parameter/fLowLand = null
+shader_parameter/fMidLand = null
+shader_parameter/fMount = null
+shader_parameter/fCountry = null
+shader_parameter/fCity = null
+shader_parameter/fAirField = null
+shader_parameter/fWood = null
+shader_parameter/fWater = null
 
 [sub_resource type="PlaneMesh" id="PlaneMesh_k08g6"]
 material = SubResource("ShaderMaterial_8fcv3")

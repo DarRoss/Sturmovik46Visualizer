@@ -21,7 +21,19 @@ public partial class HeightmapMesh : MeshInstance3D
 		heightMapPlane.SubdivideDepth = textureSize.Y / DIVISION_MODIFIER;
 		sMat.SetShaderParameter("vHeightmap", heightPct);
 		sMat.SetShaderParameter("fTypemap", MapData.Instance.Map2d);
-		sMat.SetShaderParameter("fWater", MapData.Instance.fieldmaps[(int)MapData.Fieldmap.Water, 1]);
-		sMat.SetShaderParameter("fLand", MapData.Instance.fieldmaps[(int)MapData.Fieldmap.LowLand, 3]);
+
+		int field;
+		string uniformName;
+		PortableCompressedTexture2D[] fieldVariant;	
+		for(field = 0; field < (int)MapData.Fieldmap.NumFields; ++field)
+		{
+			uniformName = "f" + MapData.FieldToStr((MapData.Fieldmap)field);
+			fieldVariant = new PortableCompressedTexture2D[] {
+				MapData.Instance.fieldmaps[field, 0],
+				MapData.Instance.fieldmaps[field, 1],
+				MapData.Instance.fieldmaps[field, 2],
+				MapData.Instance.fieldmaps[field, 3]};
+			sMat.SetShaderParameter(uniformName, fieldVariant);
+		}
 	}
 }

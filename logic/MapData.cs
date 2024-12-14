@@ -46,11 +46,11 @@ public partial class MapData : Node
         Unknown
     }
 
+    public PortableCompressedTexture2D Map2d{get; set;}
     public readonly PortableCompressedTexture2D[] submaps = 
         new PortableCompressedTexture2D[(int)Submap.NumSubmaps];
     public readonly PortableCompressedTexture2D[,] fieldmaps =
         new PortableCompressedTexture2D[(int)Fieldmap.NumFields, ENTRIES_PER_FIELD];
-    public PortableCompressedTexture2D Map2d{get; set;}
     public readonly PortableCompressedTexture2D[] roadmaps =
         new PortableCompressedTexture2D[(int)Roadmap.NumRoads];
 
@@ -107,6 +107,22 @@ public partial class MapData : Node
             "wood" => Fieldmap.Wood,
             "water" => Fieldmap.Water,
             _ => Fieldmap.Unknown,
+        };
+    }
+    
+    public static string FieldToStr(Fieldmap field)
+    {
+        return field switch
+        {
+            Fieldmap.LowLand => "LowLand",
+            Fieldmap.MidLand => "MidLand",
+            Fieldmap.Mount => "Mount",
+            Fieldmap.Country => "Country",
+            Fieldmap.City => "City",
+            Fieldmap.AirField => "Airfield",
+            Fieldmap.Wood => "Wood",
+            Fieldmap.Water => "Water",
+            _ => "Unknown",
         };
     }
 
