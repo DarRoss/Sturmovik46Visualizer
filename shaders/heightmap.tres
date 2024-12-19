@@ -2,7 +2,7 @@
 
 [sub_resource type="VisualShaderNodeExpression" id="VisualShaderNodeExpression_4bac1"]
 linked_parent_graph_frame = 17
-size = Vector2(580, 1580)
+size = Vector2(580, 1600)
 expression = "const int OFFSET_MIDLAND = 4;
 const int OFFSET_MOUNT = 8;
 const int OFFSET_COUNTRY = 12;
@@ -10,18 +10,21 @@ const int OFFSET_CITY = 16;
 const int OFFSET_AIRFIELD = 20;
 const int OFFSET_WOOD = 24;
 const int OFFSET_WATER = 28;
-
 const float DIFF = 0.0001f;
+/**
+ * In theory, RGB max is 255.
+ * In practice, it's around 211.
+ */
+const float RGB_MAX = 211.0f;
 
-float types[9];
+float samples[9];
 vec2 offset;
-
 for(int row = -1; row <= 1; ++row)
 {
 	for(int col = -1; col <= 1; ++col)
 	{
 		offset = UV + vec2(DIFF * float(col), DIFF * float(row));
-		types[(row+1) * 3 + (col+1)] = texture(typeSample, offset).r;
+		samples[(row+1) * 3 + (col+1)] = texture(typeSample, offset).r;
 	}
 }
 
@@ -29,10 +32,11 @@ vec3 colorSum = vec3(0);
 int code;
 int field;
 int index;
-//for(int i = 0; i < 9; ++i)
-for(int i = 4; i <= 4; ++i)
+// traverse surrounding samples
+for(int i = 0; i < 9; ++i)
 {
-	code = int(types[i] * rgbMax);
+	// convert [0,1] to [0,RGB_MAX]
+	code = int(samples[i] * RGB_MAX);
 	field = code % 32;
 	index = field % 4;
 	if(field < OFFSET_MIDLAND)
@@ -68,16 +72,15 @@ for(int i = 4; i <= 4; ++i)
 		colorSum += triplanar_xz(fWater[index]);
 	}
 }
-// COLOR = colorSum / vec3(9, 9, 9);
-COLOR = colorSum;"
+COLOR = colorSum / vec3(9);"
 
 [sub_resource type="VisualShaderNodeFrame" id="VisualShaderNodeFrame_gryvc"]
-size = Vector2(660, 1660)
+size = Vector2(660, 1680)
 title = "Terrain Texture Blending"
 attached_nodes = PackedInt32Array(10)
 
 [sub_resource type="VisualShaderNodeGlobalExpression" id="VisualShaderNodeGlobalExpression_0jpia"]
-size = Vector2(680, 540)
+size = Vector2(580, 340)
 expression = "uniform sampler2D fLowLand[4] : filter_nearest_mipmap, source_color;
 uniform sampler2D fMidLand[4] : filter_nearest_mipmap, source_color;
 uniform sampler2D fMount[4] : filter_nearest_mipmap, source_color;
@@ -87,23 +90,10 @@ uniform sampler2D fAirField[4] : filter_nearest_mipmap, source_color;
 uniform sampler2D fWood[4] : filter_nearest_mipmap, source_color;
 uniform sampler2D fWater[4] : filter_nearest_mipmap, source_color;
 
-vec4 triplanar_texture(sampler2D p_sampler, vec3 p_weights, vec3 p_triplanar_pos) 
+vec3 triplanar_xz(sampler2D sampler) 
 {
-	vec4 samp = vec4(0.0);
-	samp += texture(p_sampler, p_triplanar_pos.xy) * p_weights.z;
-	samp += texture(p_sampler, p_triplanar_pos.xz) * p_weights.y;
-	samp += texture(p_sampler, p_triplanar_pos.zy * vec2(-1.0, 1.0)) * p_weights.x;
-	return samp;
-}
-
-uniform float SCALE_DIVISOR = 128.0f;
-vec3 triplanar_xz(sampler2D p_sampler) 
-{
-	return texture(p_sampler, var_preFragVert.xz / vec2(SCALE_DIVISOR)).rgb;
+	return texture(sampler, var_scaledVert.xz).rgb;
 }"
-
-[sub_resource type="VisualShaderNodeUIntConstant" id="VisualShaderNodeUIntConstant_p2iqe"]
-constant = 211
 
 [sub_resource type="VisualShaderNodeTexture2DParameter" id="VisualShaderNodeTexture2DParameter_qevf3"]
 parameter_name = "fTypemap"
@@ -120,7 +110,7 @@ texture_repeat = 2
 
 [sub_resource type="VisualShaderNodeFrame" id="VisualShaderNodeFrame_siig2"]
 size = Vector2(580, 280)
-title = "Vertex Heightmap Offset"
+title = "Vertex Height Offset"
 attached_nodes = PackedInt32Array(52)
 
 [sub_resource type="VisualShaderNodeExpression" id="VisualShaderNodeExpression_qitm4"]
@@ -129,15 +119,15 @@ size = Vector2(700, 400)
 expression = "const float DIFF = 0.0001f;
 const float SCALE = 0.02f;
 
-vec2 h = vec2(DIFF, 0);
-vec2 v = vec2(0, DIFF);
+vec2 right = vec2(DIFF, 0);
+vec2 up = vec2(0, DIFF);
 
-float sample0 = texture(heightmap, UV - h).r;
-float sample1 = texture(heightmap, UV + h).r;
-float sample2 = texture(heightmap, UV - v).r;
-float sample3 = texture(heightmap, UV + v).r;
+float sampleL = texture(heightmap, UV - right).r;
+float sampleR = texture(heightmap, UV + right).r;
+float sampleD = texture(heightmap, UV - up).r;
+float sampleU = texture(heightmap, UV + up).r;
 
-NORMAL = normalize(vec3(sample0 - sample1, SCALE, sample2 - sample3));"
+NORMAL = normalize(vec3(sampleL - sampleR, SCALE, sampleD - sampleU));"
 
 [sub_resource type="VisualShaderNodeFrame" id="VisualShaderNodeFrame_aye1k"]
 size = Vector2(780, 480)
@@ -151,12 +141,20 @@ expression = "const float MAX_HEIGHT = 1024.0f;
 float sample = texture(heightmap, UV).g;
 OFFSET = VERTEX + vec3(0, sample * MAX_HEIGHT, 0);"
 
-[sub_resource type="VisualShaderNodeInput" id="VisualShaderNodeInput_wi4ao"]
-input_name = "vertex"
-
 [sub_resource type="VisualShaderNodeVaryingSetter" id="VisualShaderNodeVaryingSetter_h42gl"]
-varying_name = "preFragVert"
+varying_name = "scaledVert"
 varying_type = 4
+
+[sub_resource type="VisualShaderNodeExpression" id="VisualShaderNodeExpression_2huc5"]
+linked_parent_graph_frame = 60
+size = Vector2(420, 200)
+expression = "const float DIVISOR = 512.0f;
+SCALED_VERT = VERTEX / vec3(DIVISOR);"
+
+[sub_resource type="VisualShaderNodeFrame" id="VisualShaderNodeFrame_4i2du"]
+size = Vector2(500, 280)
+title = "Vertex Position Scaling"
+attached_nodes = PackedInt32Array(59)
 
 [resource]
 code = "shader_type spatial;
@@ -164,7 +162,7 @@ render_mode blend_mix, depth_draw_opaque, cull_back, diffuse_lambert, specular_s
 
 
 // Varyings
-varying vec3 var_preFragVert;
+varying vec3 var_scaledVert;
 
 uniform sampler2D vHeightmap : source_color, hint_default_black, filter_linear_mipmap, repeat_disable;
 uniform sampler2D fTypemap : hint_default_black, filter_nearest, repeat_disable;
@@ -180,19 +178,9 @@ uniform sampler2D fTypemap : hint_default_black, filter_nearest, repeat_disable;
 	uniform sampler2D fWood[4] : filter_nearest_mipmap, source_color;
 	uniform sampler2D fWater[4] : filter_nearest_mipmap, source_color;
 	
-	vec4 triplanar_texture(sampler2D p_sampler, vec3 p_weights, vec3 p_triplanar_pos) 
+	vec3 triplanar_xz(sampler2D sampler) 
 	{
-		vec4 samp = vec4(0.0);
-		samp += texture(p_sampler, p_triplanar_pos.xy) * p_weights.z;
-		samp += texture(p_sampler, p_triplanar_pos.xz) * p_weights.y;
-		samp += texture(p_sampler, p_triplanar_pos.zy * vec2(-1.0, 1.0)) * p_weights.x;
-		return samp;
-	}
-	
-	uniform float SCALE_DIVISOR = 128.0f;
-	vec3 triplanar_xz(sampler2D p_sampler) 
-	{
-		return texture(p_sampler, var_preFragVert.xz / vec2(SCALE_DIVISOR)).rgb;
+		return texture(sampler, var_scaledVert.xz).rgb;
 	}
 
 void vertex() {
@@ -213,15 +201,15 @@ void vertex() {
 		const float DIFF = 0.0001f;
 		const float SCALE = 0.02f;
 		
-		vec2 h = vec2(DIFF, 0);
-		vec2 v = vec2(0, DIFF);
+		vec2 right = vec2(DIFF, 0);
+		vec2 up = vec2(0, DIFF);
 		
-		float sample0 = texture(vHeightmap, UV - h).r;
-		float sample1 = texture(vHeightmap, UV + h).r;
-		float sample2 = texture(vHeightmap, UV - v).r;
-		float sample3 = texture(vHeightmap, UV + v).r;
+		float sampleL = texture(vHeightmap, UV - right).r;
+		float sampleR = texture(vHeightmap, UV + right).r;
+		float sampleD = texture(vHeightmap, UV - up).r;
+		float sampleU = texture(vHeightmap, UV + up).r;
 		
-		n_out49p0 = normalize(vec3(sample0 - sample1, SCALE, sample2 - sample3));
+		n_out49p0 = normalize(vec3(sampleL - sampleR, SCALE, sampleD - sampleU));
 	}
 
 
@@ -230,21 +218,22 @@ void vertex() {
 	NORMAL = n_out49p0;
 
 
-// Input:55
-	vec3 n_out55p0 = VERTEX;
+	vec3 n_out59p0;
+// Expression:59
+	n_out59p0 = vec3(0.0, 0.0, 0.0);
+	{
+		const float DIVISOR = 512.0f;
+		n_out59p0 = VERTEX / vec3(DIVISOR);
+	}
 
 
 // VaryingSetter:56
-	var_preFragVert = n_out55p0;
+	var_scaledVert = n_out59p0;
 
 
 }
 
 void fragment() {
-// UIntConstant:20
-	uint n_out20p0 = 211u;
-
-
 	vec3 n_out10p0;
 // Expression:10
 	n_out10p0 = vec3(0.0, 0.0, 0.0);
@@ -256,18 +245,21 @@ void fragment() {
 		const int OFFSET_AIRFIELD = 20;
 		const int OFFSET_WOOD = 24;
 		const int OFFSET_WATER = 28;
-		
 		const float DIFF = 0.0001f;
+		/**
+		 * In theory, RGB max is 255.
+		 * In practice, it's around 211.
+		 */
+		const float RGB_MAX = 211.0f;
 		
-		float types[9];
+		float samples[9];
 		vec2 offset;
-		
 		for(int row = -1; row <= 1; ++row)
 		{
 			for(int col = -1; col <= 1; ++col)
 			{
 				offset = UV + vec2(DIFF * float(col), DIFF * float(row));
-				types[(row+1) * 3 + (col+1)] = texture(fTypemap, offset).r;
+				samples[(row+1) * 3 + (col+1)] = texture(fTypemap, offset).r;
 			}
 		}
 		
@@ -275,10 +267,11 @@ void fragment() {
 		int code;
 		int field;
 		int index;
-		//for(int i = 0; i < 9; ++i)
-		for(int i = 4; i <= 4; ++i)
+		// traverse surrounding samples
+		for(int i = 0; i < 9; ++i)
 		{
-			code = int(types[i] * float(n_out20p0));
+			// convert [0,1] to [0,RGB_MAX]
+			code = int(samples[i] * RGB_MAX);
 			field = code % 32;
 			index = field % 4;
 			if(field < OFFSET_MIDLAND)
@@ -314,8 +307,7 @@ void fragment() {
 				colorSum += triplanar_xz(fWater[index]);
 			}
 		}
-		// n_out10p0 = colorSum / vec3(9, 9, 9);
-		n_out10p0 = colorSum;
+		n_out10p0 = colorSum / vec3(9);
 	}
 
 
@@ -325,9 +317,9 @@ void fragment() {
 
 }
 "
-graph_offset = Vector2(-1145.5, -145.115)
-varyings/preFragVert = "0,4"
-nodes/vertex/0/position = Vector2(220, 640)
+graph_offset = Vector2(-1169.32, 443.022)
+varyings/scaledVert = "0,4"
+nodes/vertex/0/position = Vector2(220, 740)
 nodes/vertex/2/node = SubResource("VisualShaderNodeTexture2DParameter_moouh")
 nodes/vertex/2/position = Vector2(-860, 460)
 nodes/vertex/30/node = SubResource("VisualShaderNodeFrame_siig2")
@@ -340,37 +332,44 @@ nodes/vertex/49/output_ports = "0,4,NORMAL;"
 nodes/vertex/49/expression = "const float DIFF = 0.0001f;
 const float SCALE = 0.02f;
 
-vec2 h = vec2(DIFF, 0);
-vec2 v = vec2(0, DIFF);
+vec2 right = vec2(DIFF, 0);
+vec2 up = vec2(0, DIFF);
 
-float sample0 = texture(heightmap, UV - h).r;
-float sample1 = texture(heightmap, UV + h).r;
-float sample2 = texture(heightmap, UV - v).r;
-float sample3 = texture(heightmap, UV + v).r;
+float sampleL = texture(heightmap, UV - right).r;
+float sampleR = texture(heightmap, UV + right).r;
+float sampleD = texture(heightmap, UV - up).r;
+float sampleU = texture(heightmap, UV + up).r;
 
-NORMAL = normalize(vec3(sample0 - sample1, SCALE, sample2 - sample3));"
+NORMAL = normalize(vec3(sampleL - sampleR, SCALE, sampleD - sampleU));"
 nodes/vertex/50/node = SubResource("VisualShaderNodeFrame_aye1k")
 nodes/vertex/50/position = Vector2(-580, 740)
 nodes/vertex/52/node = SubResource("VisualShaderNodeExpression_1i36r")
-nodes/vertex/52/position = Vector2(-440, 480)
+nodes/vertex/52/position = Vector2(-540, 480)
 nodes/vertex/52/size = Vector2(500, 200)
 nodes/vertex/52/input_ports = "0,8,heightmap;"
 nodes/vertex/52/output_ports = "0,4,OFFSET;"
 nodes/vertex/52/expression = "const float MAX_HEIGHT = 1024.0f;
 float sample = texture(heightmap, UV).g;
 OFFSET = VERTEX + vec3(0, sample * MAX_HEIGHT, 0);"
-nodes/vertex/55/node = SubResource("VisualShaderNodeInput_wi4ao")
-nodes/vertex/55/position = Vector2(-380, 340)
 nodes/vertex/56/node = SubResource("VisualShaderNodeVaryingSetter_h42gl")
-nodes/vertex/56/position = Vector2(-120, 340)
-nodes/vertex/connections = PackedInt32Array(2, 0, 49, 0, 49, 0, 0, 1, 52, 0, 0, 0, 2, 0, 52, 0, 55, 0, 56, 0)
+nodes/vertex/56/position = Vector2(600, 520)
+nodes/vertex/59/node = SubResource("VisualShaderNodeExpression_2huc5")
+nodes/vertex/59/position = Vector2(120, 480)
+nodes/vertex/59/size = Vector2(420, 200)
+nodes/vertex/59/input_ports = ""
+nodes/vertex/59/output_ports = "0,4,SCALED_VERT;"
+nodes/vertex/59/expression = "const float DIVISOR = 512.0f;
+SCALED_VERT = VERTEX / vec3(DIVISOR);"
+nodes/vertex/60/node = SubResource("VisualShaderNodeFrame_4i2du")
+nodes/vertex/60/position = Vector2(-440, 140)
+nodes/vertex/connections = PackedInt32Array(2, 0, 49, 0, 49, 0, 0, 1, 52, 0, 0, 0, 2, 0, 52, 0, 59, 0, 56, 0)
 nodes/fragment/0/position = Vector2(-240, 340)
 nodes/fragment/5/node = SubResource("VisualShaderNodeTexture2DParameter_qevf3")
 nodes/fragment/5/position = Vector2(-1220, 100)
 nodes/fragment/10/node = SubResource("VisualShaderNodeExpression_4bac1")
 nodes/fragment/10/position = Vector2(-900, 300)
-nodes/fragment/10/size = Vector2(580, 1580)
-nodes/fragment/10/input_ports = "0,8,typeSample;1,0,rgbMax;"
+nodes/fragment/10/size = Vector2(580, 1600)
+nodes/fragment/10/input_ports = "0,8,typeSample;"
 nodes/fragment/10/output_ports = "0,4,COLOR;"
 nodes/fragment/10/expression = "const int OFFSET_MIDLAND = 4;
 const int OFFSET_MOUNT = 8;
@@ -379,18 +378,21 @@ const int OFFSET_CITY = 16;
 const int OFFSET_AIRFIELD = 20;
 const int OFFSET_WOOD = 24;
 const int OFFSET_WATER = 28;
-
 const float DIFF = 0.0001f;
+/**
+ * In theory, RGB max is 255.
+ * In practice, it's around 211.
+ */
+const float RGB_MAX = 211.0f;
 
-float types[9];
+float samples[9];
 vec2 offset;
-
 for(int row = -1; row <= 1; ++row)
 {
 	for(int col = -1; col <= 1; ++col)
 	{
 		offset = UV + vec2(DIFF * float(col), DIFF * float(row));
-		types[(row+1) * 3 + (col+1)] = texture(typeSample, offset).r;
+		samples[(row+1) * 3 + (col+1)] = texture(typeSample, offset).r;
 	}
 }
 
@@ -398,10 +400,11 @@ vec3 colorSum = vec3(0);
 int code;
 int field;
 int index;
-//for(int i = 0; i < 9; ++i)
-for(int i = 4; i <= 4; ++i)
+// traverse surrounding samples
+for(int i = 0; i < 9; ++i)
 {
-	code = int(types[i] * rgbMax);
+	// convert [0,1] to [0,RGB_MAX]
+	code = int(samples[i] * RGB_MAX);
 	field = code % 32;
 	index = field % 4;
 	if(field < OFFSET_MIDLAND)
@@ -437,13 +440,12 @@ for(int i = 4; i <= 4; ++i)
 		colorSum += triplanar_xz(fWater[index]);
 	}
 }
-// COLOR = colorSum / vec3(9, 9, 9);
-COLOR = colorSum;"
+COLOR = colorSum / vec3(9);"
 nodes/fragment/17/node = SubResource("VisualShaderNodeFrame_gryvc")
 nodes/fragment/17/position = Vector2(-900, 260)
 nodes/fragment/18/node = SubResource("VisualShaderNodeGlobalExpression_0jpia")
-nodes/fragment/18/position = Vector2(-940, -300)
-nodes/fragment/18/size = Vector2(680, 540)
+nodes/fragment/18/position = Vector2(-900, -100)
+nodes/fragment/18/size = Vector2(580, 340)
 nodes/fragment/18/input_ports = ""
 nodes/fragment/18/output_ports = ""
 nodes/fragment/18/expression = "uniform sampler2D fLowLand[4] : filter_nearest_mipmap, source_color;
@@ -455,20 +457,8 @@ uniform sampler2D fAirField[4] : filter_nearest_mipmap, source_color;
 uniform sampler2D fWood[4] : filter_nearest_mipmap, source_color;
 uniform sampler2D fWater[4] : filter_nearest_mipmap, source_color;
 
-vec4 triplanar_texture(sampler2D p_sampler, vec3 p_weights, vec3 p_triplanar_pos) 
+vec3 triplanar_xz(sampler2D sampler) 
 {
-	vec4 samp = vec4(0.0);
-	samp += texture(p_sampler, p_triplanar_pos.xy) * p_weights.z;
-	samp += texture(p_sampler, p_triplanar_pos.xz) * p_weights.y;
-	samp += texture(p_sampler, p_triplanar_pos.zy * vec2(-1.0, 1.0)) * p_weights.x;
-	return samp;
-}
-
-uniform float SCALE_DIVISOR = 128.0f;
-vec3 triplanar_xz(sampler2D p_sampler) 
-{
-	return texture(p_sampler, var_preFragVert.xz / vec2(SCALE_DIVISOR)).rgb;
+	return texture(sampler, var_scaledVert.xz).rgb;
 }"
-nodes/fragment/20/node = SubResource("VisualShaderNodeUIntConstant_p2iqe")
-nodes/fragment/20/position = Vector2(-1120, 400)
-nodes/fragment/connections = PackedInt32Array(10, 0, 0, 0, 5, 0, 10, 0, 20, 0, 10, 1)
+nodes/fragment/connections = PackedInt32Array(10, 0, 0, 0, 5, 0, 10, 0)
